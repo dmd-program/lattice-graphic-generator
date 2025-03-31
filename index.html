@@ -185,6 +185,12 @@
     </div>
     
     <div class="control-section">
+      <div class="control-group" id="zoom-control" class="hidden">
+        <span class="control-label">Zoom:</span>
+        <span class="control-value" id="zoom-value">100%</span>
+        <button id="reset-zoom-btn" style="font-size: 10px; padding: 2px 5px; margin-left: 5px;">Reset</button>
+        <span class="control-hint">(Scroll Mouse)</span>
+      </div>
       <div class="control-group">
         <span class="control-label">Background:</span>
         <input type="color" id="bg-color-picker" value="#FFFFFF">
@@ -227,6 +233,12 @@
     let randomRotation = true;
     let bgColor = '#FFFFFF'; // Background color
     let bgOpacity = 100; // Background opacity (0-100)
+    let zoomLevel = 1.0; // Zoom level (1.0 = 100%)
+    let panX = 0; // Pan X offset
+    let panY = 0; // Pan Y offset
+    let isPanning = false; // Flag for panning state
+    let lastMouseX = 0; // Last mouse X position for panning
+    let lastMouseY = 0; // Last mouse Y position for panning
     
     // Color scheme definitions
     const colorSchemes = [
@@ -329,6 +341,12 @@
       bgColorObj.setAlpha(bgOpacity * 255 / 100); // Convert percentage to 0-255 range
       background(bgColorObj);
       
+      // Apply zoom and pan transformations
+      push();
+      translate(width/2 + panX, height/2 + panY);
+      scale(zoomLevel);
+      translate(-width/2, -height/2);
+      
       // Draw all shapes with current colors
       for (let shape of shapes) {
         drawLattice(
@@ -338,6 +356,22 @@
           shape.rotation,
           getColorForShape(shape.index)
         );
+      }
+      
+      // End zoom/pan transformations
+      pop();
+      
+      // Draw zoom level indicator if zoomed
+      if (zoomLevel !== 1.0) {
+        push();
+        noStroke();
+        fill(0, 0, 0, 150);
+        rect(10, 10, 100, 25, 5);
+        fill(255);
+        textAlign(LEFT, CENTER);
+        textSize(12);
+        text(`Zoom: ${Math.round(zoomLevel * 100)}%`, 15, 22);
+        pop();
       }
     }
     
@@ -361,6 +395,15 @@
       // Save button
       document.getElementById('save-btn').addEventListener('click', function() {
         toggleDownloadDialog(true);
+      });
+      
+      // Reset zoom button
+      document.getElementById('reset-zoom-btn').addEventListener('click', function() {
+        zoomLevel = 1.0;
+        panX = 0;
+        panY = 0;
+        updateUIControls();
+        redraw();
       });
       
       // Background color picker
@@ -443,7 +486,7 @@
       }
     }
     
-    // Update UI controls to reflect current values
+    // Add a control for resetting zoom and pan
     function updateUIControls() {
       document.getElementById('pattern-value').textContent = patternModes[currentPatternMode].name;
       document.getElementById('colors-value').textContent = colorCount;
@@ -453,6 +496,17 @@
       document.getElementById('saturation-slider').value = baseSaturation;
       document.getElementById('rotation-value').textContent = randomRotation ? 'Random' : 'Fixed';
       document.getElementById('scheme-value').textContent = colorSchemes[currentColorScheme].name;
+      
+      // Show zoom reset button if zoomed
+      const zoomControlDiv = document.getElementById('zoom-control');
+      if (zoomControlDiv) {
+        if (zoomLevel !== 1.0 || panX !== 0 || panY !== 0) {
+          zoomControlDiv.classList.remove('hidden');
+          document.getElementById('zoom-value').textContent = Math.round(zoomLevel * 100) + '%';
+        } else {
+          zoomControlDiv.classList.add('hidden');
+        }
+      }
       
       // Update color preview swatches
       updateColorPreview();
