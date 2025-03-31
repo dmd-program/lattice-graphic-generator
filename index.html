@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DMD Lattice Pattern Generator</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body {
       margin: 0;
@@ -185,6 +186,16 @@
     
     <div class="control-section">
       <div class="control-group">
+        <span class="control-label">Background:</span>
+        <input type="color" id="bg-color-picker" value="#FFFFFF">
+        <div class="slider-container" style="margin-top: 5px;">
+          <span class="control-label" style="font-size: 9px;">Opacity:</span>
+          <input type="range" id="bg-opacity-slider" min="0" max="100" step="5" value="100" style="width: 80px;">
+          <span class="control-value" id="bg-opacity-value" style="width: 30px;">100%</span>
+        </div>
+        <button id="reset-bg-btn" style="font-size: 10px; padding: 2px 5px; margin-top: 5px;">Reset</button>
+      </div>
+      <div class="control-group">
         <button id="generate-btn">Generate New Pattern (Click)</button>
       </div>
       <div class="control-group">
@@ -214,6 +225,8 @@
     let currentColorScheme = 0;
     let currentPatternMode = 0;
     let randomRotation = true;
+    let bgColor = '#FFFFFF'; // Background color
+    let bgOpacity = 100; // Background opacity (0-100)
     
     // Color scheme definitions
     const colorSchemes = [
@@ -234,19 +247,87 @@
       { name: "Fibonacci", description: "Golden ratio distribution" }
     ];
     
+    // Parse URL parameters
+    function getUrlParams() {
+      const params = {};
+      const queryString = window.location.search;
+      const urlParams = new URLSearchParams(queryString);
+      
+      // Get width and height parameters if present
+      if (urlParams.has('w')) {
+        params.width = parseInt(urlParams.get('w'));
+      }
+      if (urlParams.has('h')) {
+        params.height = parseInt(urlParams.get('h'));
+      }
+      
+      return params;
+    }
+    
     // p5.js setup
     function setup() {
-      createCanvas(windowWidth, windowHeight - document.getElementById('control-panel').offsetHeight);
+      // Check for URL parameters
+      const params = getUrlParams();
+      let canvasWidth, canvasHeight;
+      
+      // If width and height are specified in URL, use those values
+      if (params.width && params.height) {
+        canvasWidth = params.width;
+        canvasHeight = params.height;
+        
+        // Create a container for fixed-size canvas
+        const canvasContainer = document.createElement('div');
+        canvasContainer.style.display = 'flex';
+        canvasContainer.style.justifyContent = 'center';
+        canvasContainer.style.alignItems = 'center';
+        canvasContainer.style.padding = '20px';
+        canvasContainer.style.backgroundColor = '#f0f0f0';
+        
+        // Insert before the control panel
+        document.body.insertBefore(canvasContainer, document.getElementById('control-panel'));
+        
+        // Create canvas with the specified dimensions
+        const canvas = createCanvas(canvasWidth, canvasHeight);
+        canvas.parent(canvasContainer);
+        
+        // Add dimension indicator
+        const dimensionInfo = document.createElement('div');
+        dimensionInfo.innerHTML = `Canvas Size: ${canvasWidth}px × ${canvasHeight}px (Set by URL parameters)`;
+        dimensionInfo.style.position = 'absolute';
+        dimensionInfo.style.top = '5px';
+        dimensionInfo.style.left = '5px';
+        dimensionInfo.style.backgroundColor = 'rgba(0,0,0,0.6)';
+        dimensionInfo.style.color = 'white';
+        dimensionInfo.style.padding = '5px 10px';
+        dimensionInfo.style.borderRadius = '3px';
+        dimensionInfo.style.fontSize = '12px';
+        canvasContainer.appendChild(dimensionInfo);
+      } else {
+        // Otherwise, use full window size
+        canvasWidth = windowWidth;
+        canvasHeight = windowHeight - document.getElementById('control-panel').offsetHeight;
+        createCanvas(canvasWidth, canvasHeight);
+      }
+      
       pixelDensity(displayDensity());
       colorMode(HSB, 360, 100, 100, 255);
       generatePattern();
       updateUIControls();
       setupEventListeners();
       noLoop();
+      
+      // Add debug info
+      console.log(`Canvas created with dimensions: ${canvasWidth}x${canvasHeight}`);
     }
     
     function draw() {
-      background(255);
+      // Clear the canvas with transparent background first
+      clear();
+      
+      // Draw background with color and opacity
+      const bgColorObj = color(bgColor);
+      bgColorObj.setAlpha(bgOpacity * 255 / 100); // Convert percentage to 0-255 range
+      background(bgColorObj);
       
       // Draw all shapes with current colors
       for (let shape of shapes) {
@@ -261,8 +342,12 @@
     }
     
     function windowResized() {
-      resizeCanvas(windowWidth, windowHeight - document.getElementById('control-panel').offsetHeight);
-      redraw();
+      // Only resize if we're using window dimensions (no URL params)
+      const params = getUrlParams();
+      if (!params.width || !params.height) {
+        resizeCanvas(windowWidth, windowHeight - document.getElementById('control-panel').offsetHeight);
+        redraw();
+      }
     }
     
     // UI event listeners
@@ -276,6 +361,29 @@
       // Save button
       document.getElementById('save-btn').addEventListener('click', function() {
         toggleDownloadDialog(true);
+      });
+      
+      // Background color picker
+      document.getElementById('bg-color-picker').addEventListener('input', function() {
+        bgColor = this.value;
+        redraw();
+      });
+      
+      // Background opacity slider
+      document.getElementById('bg-opacity-slider').addEventListener('input', function() {
+        bgOpacity = parseInt(this.value);
+        document.getElementById('bg-opacity-value').textContent = bgOpacity + '%';
+        redraw();
+      });
+      
+      // Reset background button
+      document.getElementById('reset-bg-btn').addEventListener('click', function() {
+        bgColor = '#FFFFFF';
+        bgOpacity = 100;
+        document.getElementById('bg-color-picker').value = '#FFFFFF';
+        document.getElementById('bg-opacity-slider').value = 100;
+        document.getElementById('bg-opacity-value').textContent = '100%';
+        redraw();
       });
       
       // Contrast slider
