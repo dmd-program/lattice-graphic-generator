@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DMD Lattice Pattern Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    
+    canvas {
+      display: block;
+    }
+    
+    #control-panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 10px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+    
+    .control-section {
+      margin: 5px 0;
+      min-width: 200px;
+    }
+    
+    .control-group {
+      margin-bottom: 10px;
+    }
+    
+    .control-label {
+      font-size: 11px;
+      opacity: 0.8;
+      margin-right: 5px;
+    }
+    
+    .control-value {
+      font-size: 12px;
+      font-weight: bold;
+    }
+    
+    .control-hint {
+      font-size: 10px;
+      opacity: 0.6;
+      margin-left: 5px;
+    }
+    
+    .slider-container {
+      display: flex;
+      align-items: center;
+      margin: 5px 0;
+    }
+    
+    input[type="range"] {
+      width: 100px;
+    }
+    
+    .color-preview {
+      display: inline-block;
+      margin-right: 5px;
+      width: 15px;
+      height: 12px;
+      border: 1px solid #ccc;
+    }
+    
+    .download-dialog {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      color: black;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+      z-index: 1000;
+      width: 300px;
+    }
+    
+    .download-dialog h3 {
+      margin-top: 0;
+      text-align: center;
+    }
+    
+    .download-dialog p {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    
+    .download-dialog button {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      margin: 10px 0;
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    
+    .download-dialog button:hover {
+      background: #e0e0ff;
+    }
+    
+    .overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
+    }
+    
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Canvas will be created here by p5.js -->
+  
+  <!-- Control Panel -->
+  <div id="control-panel">
+    <div class="control-section">
+      <div class="control-group">
+        <span class="control-label">Pattern:</span>
+        <span class="control-value" id="pattern-value">Normal</span>
+        <span class="control-hint">(V)</span>
+      </div>
+      <div class="control-group">
+        <span class="control-label">Colors:</span>
+        <span class="control-value" id="colors-value">5</span>
+        <span class="control-hint">(↑/↓)</span>
+      </div>
+    </div>
+    
+    <div class="control-section">
+      <div class="control-group">
+        <span class="control-label">Contrast:</span>
+        <div class="slider-container">
+          <input type="range" id="contrast-slider" min="0.5" max="2.0" step="0.1" value="1.0">
+          <span class="control-value" id="contrast-value">1.0x</span>
+          <span class="control-hint">(←/→)</span>
+        </div>
+      </div>
+      <div class="control-group">
+        <span class="control-label">Saturation:</span>
+        <div class="slider-container">
+          <input type="range" id="saturation-slider" min="0" max="100" step="5" value="80">
+          <span class="control-value" id="saturation-value">80%</span>
+          <span class="control-hint">(,/.)</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="control-section">
+      <div class="control-group">
+        <span class="control-label">Rotation:</span>
+        <span class="control-value" id="rotation-value">Random</span>
+        <span class="control-hint">(R)</span>
+      </div>
+      <div class="control-group">
+        <span class="control-label">Scheme:</span>
+        <span class="control-value" id="scheme-value">Rainbow</span>
+        <span class="control-hint">(C)</span>
+        <div id="color-preview-container">
+          <!-- Color swatches will be added here by JS -->
+        </div>
+      </div>
+    </div>
+    
+    <div class="control-section">
+      <div class="control-group">
+        <button id="generate-btn">Generate New Pattern (Click)</button>
+      </div>
+      <div class="control-group">
+        <button id="save-btn">Save Artwork (P)</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Download Dialog (hidden by default) -->
+  <div id="overlay" class="overlay hidden"></div>
+  <div id="download-dialog" class="download-dialog hidden">
+    <h3>Save Artwork</h3>
+    <p>Choose format to download</p>
+    <button id="png-btn">PNG Image</button>
+    <button id="jpg-btn">JPG Image</button>
+    <button id="svg-btn">SVG Vector</button>
+    <button id="pdf-btn">PDF Document</button>
+  </div>
+  
+  <script>
+    // Global variables
+    let shapes = [];
+    let colorSeed = 0;
+    let contrastLevel = 1.0;
+    let colorCount = 5;
+    let baseSaturation = 80;
+    let currentColorScheme = 0;
+    let currentPatternMode = 0;
+    let randomRotation = true;
+    
+    // Color scheme definitions
+    const colorSchemes = [
+      { name: "Rainbow", hueStart: 0, hueSpread: 360 },
+      { name: "Complementary", hueStart: 0, hueSpread: 180 },
+      { name: "Analogous", hueStart: 120, hueSpread: 60 },
+      { name: "Monochromatic", hueStart: 240, hueSpread: 0 },
+      { name: "Triad", hueStart: 0, hueSpread: 120 },
+      { name: "Random", hueStart: -1, hueSpread: -1 }
+    ];
+    
+    // Pattern mode definitions
+    const patternModes = [
+      { name: "Normal", description: "Uniform random distribution" },
+      { name: "Tri-Modal", description: "5% large, 70% medium, 25% small" },
+      { name: "Gaussian", description: "Bell curve distribution" },
+      { name: "Perlin", description: "Perlin noise-based clustering" },
+      { name: "Fibonacci", description: "Golden ratio distribution" }
+    ];
+    
+    // p5.js setup
+    function setup() {
+      createCanvas(windowWidth, windowHeight - document.getElementById('control-panel').offsetHeight);
+      pixelDensity(displayDensity());
+      colorMode(HSB, 360, 100, 100, 255);
+      generatePattern();
+      updateUIControls();
+      setupEventListeners();
+      noLoop();
+    }
+    
+    function draw() {
+      background(255);
+      
+      // Draw all shapes with current colors
+      for (let shape of shapes) {
+        drawLattice(
+          shape.x, 
+          shape.y, 
+          shape.size, 
+          shape.rotation,
+          getColorForShape(shape.index)
+        );
+      }
+    }
+    
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight - document.getElementById('control-panel').offsetHeight);
+      redraw();
+    }
+    
+    // UI event listeners
+    function setupEventListeners() {
+      // Generate button
+      document.getElementById('generate-btn').addEventListener('click', function() {
+        generatePattern();
+        redraw();
+      });
+      
+      // Save button
+      document.getElementById('save-btn').addEventListener('click', function() {
+        toggleDownloadDialog(true);
+      });
+      
+      // Contrast slider
+      document.getElementById('contrast-slider').addEventListener('input', function() {
+        contrastLevel = parseFloat(this.value);
+        updateUIControls();
+        redraw();
+      });
+      
+      // Saturation slider
+      document.getElementById('saturation-slider').addEventListener('input', function() {
+        baseSaturation = parseInt(this.value);
+        updateUIControls();
+        redraw();
+      });
+      
+      // Download dialog buttons
+      document.getElementById('png-btn').addEventListener('click', function() {
+        downloadArtwork('png');
+        toggleDownloadDialog(false);
+      });
+      
+      document.getElementById('jpg-btn').addEventListener('click', function() {
+        downloadArtwork('jpg');
+        toggleDownloadDialog(false);
+      });
+      
+      document.getElementById('svg-btn').addEventListener('click', function() {
+        alert("SVG support is limited in p5.js. For best results, use PNG or JPG.");
+        downloadArtwork('svg');
+        toggleDownloadDialog(false);
+      });
+      
+      document.getElementById('pdf-btn').addEventListener('click', function() {
+        alert("PDF support is limited in p5.js. For best results, use PNG or JPG.");
+        downloadArtwork('pdf');
+        toggleDownloadDialog(false);
+      });
+      
+      // Close dialog when clicking overlay
+      document.getElementById('overlay').addEventListener('click', function() {
+        toggleDownloadDialog(false);
+      });
+    }
+    
+    // Toggle download dialog visibility
+    function toggleDownloadDialog(show) {
+      const dialog = document.getElementById('download-dialog');
+      const overlay = document.getElementById('overlay');
+      
+      if (show) {
+        dialog.classList.remove('hidden');
+        overlay.classList.remove('hidden');
+      } else {
+        dialog.classList.add('hidden');
+        overlay.classList.add('hidden');
+      }
+    }
+    
+    // Update UI controls to reflect current values
+    function updateUIControls() {
+      document.getElementById('pattern-value').textContent = patternModes[currentPatternMode].name;
+      document.getElementById('colors-value').textContent = colorCount;
+      document.getElementById('contrast-value').textContent = contrastLevel.toFixed(1) + 'x';
+      document.getElementById('contrast-slider').value = contrastLevel;
+      document.getElementById('saturation-value').textContent = baseSaturation + '%';
+      document.getElementById('saturation-slider').value = baseSaturation;
+      document.getElementById('rotation-value').textContent = randomRotation ? 'Random' : 'Fixed';
+      document.getElementById('scheme-value').textContent = colorSchemes[currentColorScheme].name;
+      
+      // Update color preview swatches
+      updateColorPreview();
+    }
+    
+    // Update color preview swatches
+    function updateColorPreview() {
+      const container = document.getElementById('color-preview-container');
+      container.innerHTML = '';
+      
+      for (let i = 0; i < 5; i++) {
+        const swatch = document.createElement('div');
+        swatch.className = 'color-preview';
+        
+        let previewHue = 0;
+        
+        if (colorSchemes[currentColorScheme].hueStart === -1 && 
+            colorSchemes[currentColorScheme].hueSpread === -1) {
+          // Random color scheme
+          if (colorCount === 1) {
+            previewHue = (colorSeed * 73) % 360;
+          } else if (i < colorCount) {
+            previewHue = ((i * 73 + colorSeed * 13) % 360 + (i * 47)) % 360;
+          }
+        } else if (colorSchemes[currentColorScheme].hueSpread === 0) {
+          previewHue = colorSchemes[currentColorScheme].hueStart;
+        } else if (i < colorCount) {
+          previewHue = (colorSchemes[currentColorScheme].hueStart + 
+                        (i * colorSchemes[currentColorScheme].hueSpread / 
+                         Math.max(1, colorCount - 1))) % 360;
+        }
+        
+        if (i < colorCount) {
+          swatch.style.backgroundColor = `hsl(${previewHue}, ${baseSaturation}%, ${90}%)`;
+          swatch.style.opacity = '1';
+        } else {
+          swatch.style.backgroundColor = 'hsl(0, 0%, 50%)';
+          swatch.style.opacity = '0.1';
+        }
+        
+        container.appendChild(swatch);
+      }
+    }
+    
+    // Key pressed event
+    function keyPressed() {
+      let redrawNeeded = true;
+      
+      if (keyCode === RIGHT_ARROW) {
+        contrastLevel = constrain(contrastLevel + 0.1, 0.5, 2.0);
+        document.getElementById('contrast-slider').value = contrastLevel;
+      } else if (keyCode === LEFT_ARROW) {
+        contrastLevel = constrain(contrastLevel - 0.1, 0.5, 2.0);
+        document.getElementById('contrast-slider').value = contrastLevel;
+      } else if (keyCode === UP_ARROW) {
+        colorCount = constrain(colorCount + 1, 1, 5);
+      } else if (keyCode === DOWN_ARROW) {
+        colorCount = constrain(colorCount - 1, 1, 5);
+      } else if (keyCode === 190) { // PERIOD key
+        baseSaturation = constrain(baseSaturation + 5, 0, 100);
+        document.getElementById('saturation-slider').value = baseSaturation;
+      } else if (keyCode === 188) { // COMMA key
+        baseSaturation = constrain(baseSaturation - 5, 0, 100);
+        document.getElementById('saturation-slider').value = baseSaturation;
+      } else if (key === 'c' || key === 'C') {
+        currentColorScheme = (currentColorScheme + 1) % colorSchemes.length;
+      } else if (key === 'v' || key === 'V') {
+        currentPatternMode = (currentPatternMode + 1) % patternModes.length;
+        generatePattern();
+      } else if (key === 'r' || key === 'R') {
+        randomRotation = !randomRotation;
+        for (let shape of shapes) {
+          shape.rotation = randomRotation ? random(0, TWO_PI) : 0;
+        }
+      } else if (key === 'p' || key === 'P') {
+        toggleDownloadDialog(true);
+      } else if (document.getElementById('download-dialog').classList.contains('hidden') === false) {
+        // Any key closes the dialog if it's open
+        toggleDownloadDialog(false);
+        redrawNeeded = false;
+      } else {
+        redrawNeeded = false;
+      }
+      
+      if (redrawNeeded) {
+        updateUIControls();
+        redraw();
+        return false; // Prevent default
+      }
+    }
+    
+    // Download artwork in selected format
+    function downloadArtwork(format) {
+      const timestamp = year() + nf(month(), 2) + nf(day(), 2) + "-" + nf(hour(), 2) + nf(minute(), 2) + nf(second(), 2);
+      const filename = `lattice-art-${timestamp}`;
+      
+      switch(format) {
+        case 'png':
+          saveCanvas(filename, 'png');
+          break;
+        case 'jpg':
+          saveCanvas(filename, 'jpg');
+          break;
+        case 'svg':
+          saveCanvas(filename, 'svg');
+          break;
+        case 'pdf':
+          saveCanvas(filename, 'pdf');
+          break;
+      }
+    }
+    
+    // Generate random positions, sizes, and rotations for shapes
+    function generatePattern() {
+      shapes = [];
+      
+      // Create temporary values for Perlin noise calculations
+      const noiseScale = random(0.01, 0.1);
+      const noiseOffsetX = random(0, 1000);
+      const noiseOffsetY = random(0, 1000);
+      const goldenRatio = 1.61803398875;
+      
+      // Allow shapes to extend beyond canvas edges
+      const margin = -30; // Negative margin means shapes can go off-canvas
+      
+      for (let i = 0; i < 200; i++) {
+        let x, y, size;
+        
+        // Different pattern generation based on current mode
+        switch(currentPatternMode) {
+          case 0: // Normal - Uniform random distribution
+            x = random(margin, width - margin);
+            y = random(margin, height - margin);
+            size = random(30, 120);
+            break;
+            
+          case 1: // Tri-Modal - 5% large, 70% medium, 25% small
+            x = random(margin, width - margin);
+            y = random(margin, height - margin);
+            
+            const sizeRoll = random(100);
+            if (sizeRoll < 5) {
+              // 5% extremely large
+              size = random(100, 180);
+            } else if (sizeRoll < 75) {
+              // 70% medium
+              size = random(50, 80);
+            } else {
+              // 25% small
+              size = random(20, 40);
+            }
+            break;
+            
+          case 2: // Gaussian - Bell curve distribution
+            // Box-Muller transform to convert uniform to gaussian
+            const u1 = random();
+            const u2 = random();
+            const z0 = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(TWO_PI * u2);
+            const z1 = Math.sqrt(-2.0 * Math.log(u1)) * Math.sin(TWO_PI * u2);
+            
+            // Use gaussian distribution for position and size
+            x = width/2 + z0 * (width * 0.25); // Wider spread
+            y = height/2 + z1 * (height * 0.25); // Wider spread
+            size = 70 + random(-1, 1) * 20; // More uniform sizes
+            break;
+            
+          case 3: // Perlin noise-based clustering
+            // Use Perlin noise to create natural looking clusters
+            // Wider range to extend past edges
+            const noiseVal = noise((i * noiseScale) + noiseOffsetX, noiseOffsetY);
+            const noiseVal2 = noise(noiseOffsetX, (i * noiseScale) + noiseOffsetY);
+            
+            x = map(noiseVal, 0, 1, margin, width - margin);
+            y = map(noiseVal2, 0, 1, margin, height - margin);
+            size = map(noise(noiseVal, noiseVal2), 0, 1, 30, 120);
+            break;
+            
+          case 4: // Fibonacci - Golden ratio distribution
+            // Use golden ratio to distribute points in a wider radius
+            const goldenAngle = TWO_PI / goldenRatio;
+            const t = i * goldenAngle;
+            const radialDist = sqrt(i) * (width * 0.004); // Increased radius
+            
+            x = width/2 + cos(t) * radialDist * 60;
+            y = height/2 + sin(t) * radialDist * 60;
+            size = map(i % 15, 0, 14, 30, 90); // Size cycle based on Fibonacci sequence
+            break;
+        }
+        
+        // Apply rotation based on randomRotation setting
+        let rotation = 0;
+        if (randomRotation) {
+          rotation = random(0, TWO_PI);
+        }
+        
+        shapes.push({
+          x: x,
+          y: y,
+          size: size,
+          rotation: rotation,
+          index: i
+        });
+      }
+      
+      // Reset color seed when generating new pattern
+      colorSeed = random(1000);
+    }
+    
+    // Get color properties for a shape based on its index and the current color settings
+    function getColorForShape(index) {
+      // Determine which color from the palette to use
+      let colorIndex = 0;
+      
+      if (colorCount > 1) {
+        // Use modulo to assign one of the available colors
+        colorIndex = index % colorCount;
+      }
+      
+      // Get the current color scheme
+      const scheme = colorSchemes[currentColorScheme];
+      
+      // Calculate hue based on color scheme and available colors
+      let hue;
+      
+      if (scheme.hueStart === -1 && scheme.hueSpread === -1) {
+        // Random color scheme
+        if (colorCount === 1) {
+          // With 1 color, use a single random hue for all shapes
+          hue = (colorSeed * 73) % 360;
+        } else {
+          // With multiple colors, each color in the palette gets a random but consistent hue
+          hue = ((colorIndex * 73 + colorSeed * 13) % 360 + (colorIndex * 47)) % 360;
+        }
+      } else if (scheme.hueSpread === 0) {
+        // For monochromatic scheme, use fixed hue
+        hue = scheme.hueStart;
+      } else if (colorCount === 1) {
+        // For single color, use start of scheme
+        hue = scheme.hueStart;
+      } else {
+        // Distribute colors evenly across the scheme's hue spread
+        hue = (scheme.hueStart + (colorIndex * scheme.hueSpread / (colorCount - 1))) % 360;
+      }
+      
+      // Calculate base values
+      let brightness = map(cos(index * 0.5 + colorSeed), -1, 1, 70, 100);
+      let alpha = map(sin(index * 0.7 + colorSeed * 2), -1, 1, 80, 220);
+      
+      // Apply contrast adjustment
+      let adjustedSaturation = baseSaturation * contrastLevel;
+      adjustedSaturation = constrain(adjustedSaturation, 0, 100);
+      
+      // For brightness, enhance the difference from the midpoint (85)
+      let brightnessDeviation = brightness - 85;
+      let adjustedBrightness = 85 + brightnessDeviation * contrastLevel;
+      adjustedBrightness = constrain(adjustedBrightness, 30, 100);
+      
+      // Also adjust alpha for contrast
+      let adjustedAlpha = map(alpha, 80, 220, 80, 220 * contrastLevel);
+      adjustedAlpha = constrain(adjustedAlpha, 50, 255);
+      
+      return {
+        hue: hue,
+        saturation: adjustedSaturation,
+        brightness: adjustedBrightness,
+        alpha: adjustedAlpha,
+        strokeWidth: map(noise(index * 0.1, colorSeed), 0, 1, 1, 4 * sqrt(contrastLevel)),
+        hasFill: (index + colorSeed) % 10 > 5
+      };
+    }
+    
+    // Draw lattice shape
+    function drawLattice(x, y, size, rotation, colorProps) {
+      push();
+      translate(x, y);
+      rotate(rotation);
+      
+      // Apply color properties
+      if (colorProps.hasFill) {
+        fill(colorProps.hue, colorProps.saturation, colorProps.brightness, colorProps.alpha * 0.3);
+      } else {
+        noFill();
+      }
+      
+      // Set stroke properties
+      stroke(colorProps.hue, colorProps.saturation * 0.8, colorProps.brightness * 0.7, colorProps.alpha);
+      strokeWeight(colorProps.strokeWidth);
+      strokeCap(ROUND);
+      strokeJoin(ROUND);
+      
+      // Scale according to size
+      const scale = size / 42; // SVG is 42x42
+      
+      // Draw all polygons from the SVG using p5.js commands
+      // Triangle 1
+      beginShape();
+      vertex(8.3 * scale - size/2, 10.2 * scale - size/2);
+      vertex(14.6 * scale - size/2, 21.1 * scale - size/2);
+      vertex(2 * scale - size/2, 21.1 * scale - size/2);
+      endShape(CLOSE);
+      
+      // Triangle 2
+      beginShape();
+      vertex(20.9 * scale - size/2, 10.2 * scale - size/2);
+      vertex(27.2 * scale - size/2, 21.1 * scale - size/2);
+      vertex(14.6 * scale - size/2, 21.1 * scale - size/2);
+      endShape(CLOSE);
+      
+      // Triangle 3
+      beginShape();
+      vertex(14.6 * scale - size/2, 21.1 * scale - size/2);
+      vertex(8.3 * scale - size/2, 10.2 * scale - size/2);
+      vertex(20.9 * scale - size/2, 10.2 * scale - size/2);
+      endShape(CLOSE);
+      
+      // Triangle 4
+      beginShape();
+      vertex(27.2 * scale - size/2, 21.1 * scale - size/2);
+      vertex(20.9 * scale - size/2, 10.2 * scale - size/2);
+      vertex(33.5 * scale - size/2, 10.2 * scale - size/2);
+      endShape(CLOSE);
+      
+      // Triangle 5
+      beginShape();
+      vertex(14.6 * scale - size/2, 21.1 * scale - size/2);
+      vertex(20.9 * scale - size/2, 32 * scale - size/2);
+      vertex(8.3 * scale - size/2, 32 * scale - size/2);
+      endShape(CLOSE);
+      
+      // Triangle 6
+      beginShape();
+      vertex(27.2 * scale - size/2, 21.1 * scale - size/2);
+      vertex(33.5 * scale - size/2, 32 * scale - size/2);
+      vertex(20.9 * scale - size/2, 32 * scale - size/2);
+      endShape(CLOSE);
+      
+      // Triangle 7
+      beginShape();
+      vertex(20.9 * scale - size/2, 32 * scale - size/2);
+      vertex(14.6 * scale - size/2, 21.1 * scale - size/2);
+      vertex(27.2 * scale - size/2, 21.1 * scale - size/2);
+      endShape(CLOSE);
+      
+      // Triangle 8
+      beginShape();
+      vertex(33.5 * scale - size/2, 32 * scale - size/2);
+      vertex(27.2 * scale - size/2, 21.1 * scale - size/2);
+      vertex(39.8 * scale - size/2, 21.1 * scale - size/2);
+      endShape(CLOSE);
+      
+      pop();
+    }
+  </script>
+</body>
+</html>
