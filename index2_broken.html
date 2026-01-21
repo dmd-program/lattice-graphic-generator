@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Isometric Grid Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    
+    canvas {
+      display: block;
+    }
+    
+    #control-panel {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: center;
+    }
+    
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    
+    .control-label {
+      font-size: 11px;
+      opacity: 0.8;
+    }
+    
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    input[type="range"] {
+      width: 120px;
+    }
+    
+    .value-display {
+      font-size: 12px;
+      font-weight: bold;
+      min-width: 30px;
+    }
+    
+    button {
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    
+    button:hover {
+      background-color: #45a049;
+    }
+    
+    select {
+      background-color: #333;
+      color: white;
+      border: 1px solid #555;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    
+    select:hover {
+      background-color: #444;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-left: auto;
+    }
+    
+    input[type="color"] {
+      width: 40px;
+      height: 30px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .color-control {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+  </style>
+</head>
+<body>
+  <script>
+    let gridSize = 30;
+    let dotSize = 3;
+    let bgColor, dotColor, triColor;
+    let triangles = [];
+    let generationModel = 'random';
+    let strokeColor, fillColor;
+    let strokeWidth = 0;
+    let fillMode = 'solid'; // 'solid' or 'random'
+    let saturation = 50;
+    let brightness = 50;
+    
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+      colorMode(HSB, 360, 100, 100);
+      bgColor = color(0, 0, 100); // white
+      dotColor = color(0, 0, 80); // light gray
+      triColor = color(0, 0, 20); // dark gray
+      strokeColor = color(0, 0, 0); // black
+      fillColor = color(0, 0, 20);
+      
+      // Create controls
+      createControls();
+    }
+    
+    function draw() {
+      background(bgColor);
+      
+      // Draw filled triangles first
+      drawFilledTriangles();
+      
+      // Draw dots on top
+      drawIsometricTriangleGrid();
+    }
+    
+    function drawIsometricTriangleGrid() {
+      noStroke();
+      fill(dotColor);
+      
+      // For equilateral triangles in isometric grid:
+      // Height of triangle = sqrt(3)/2 * side length
+      // We'll create a grid that fills the screen
+      
+      const triangleHeight = (Math.sqrt(3) / 2) * gridSize;
+      const halfSize = gridSize / 2;
+      
+      // Calculate how many rows and columns we need to fill the screen
+      const numRows = Math.ceil(height / triangleHeight) + 2;
+      const numCols = Math.ceil(width / gridSize) + 2;
+      
+      // Start from top-left with some margin
+      const startX = -gridSize;
+      const startY = -triangleHeight;
+      
+      // Draw vertices of equilateral triangles
+      for (let row = 0; row < numRows; row++) {
+        for (let col = 0; col < numCols; col++) {
+          let x, y;
+          
+          if (row % 2 === 0) {
+            // Even rows: regular spacing
+            x = startX + col * gridSize;
+            y = startY + row * triangleHeight;
+          } else {
+            // Odd rows: offset by half gridSize
+            x = startX + col * gridSize + halfSize;
+            y = startY + row * triangleHeight;
+          }
+          
+          // Draw dot at vertex
+          circle(x, y, dotSize);
+        }
+      }
+    }
+    
+    function drawFilledTriangles() {
+      const triangleHeight = (Math.sqrt(3) / 2) * gridSize;
+      const halfSize = gridSize / 2;
+      const startX = -gridSize;
+      const startY = -triangleHeight;
+      
+      // Set stroke
+      if (strokeWidth > 0) {
+        stroke(strokeColor);
+      // Helper function to get grid point position
+      const getGridPoint = (r, c) => {
+        if (r % 2 === 0) {
+          return {x: startX + c * gridSize, y: startY + r * triangleHeight};
+        } else {
+          return {x: startX + c * gridSize + halfSize, y: startY + r * triangleHeight};
+        }
+      };
+      
+      for (let tri of triangles) {
+        // Set fill color based on mode
+        if (fillMode === 'random') {
+          let h = random(360);
+          fill(h, saturation, brightness);
+        } else {
+          fill(fillColor);
+        }if (r % 2 === 0) {
+            return {x: startX + c * gridSize, y: startY + r * triangleHeight};
+          } else {
+            return {x: startX + c * gridSize + halfSize, y: startY + r * triangleHeight};
+          }
+        };
+        
+        let v1, v2, v3;
+        
+        if (tri.pointsUp) {
+          // Upward triangle connects three specific grid points
+          v1 = getGridPoint(tri.row, tri.col);
+          v2 = getGridPoint(tri.row, tri.col + 1);
+          
+          // The apex depends on which row we're on
+          if (tri.row % 2 === 0) {
+            // Even row: apex is at (row+1, col) which has offset
+            v3 = getGridPoint(tri.row + 1, tri.col);
+          } else {
+            // Odd row: apex is at (row+1, col+1) which returns to regular
+            v3 = getGridPoint(tri.row + 1, tri.col + 1);
+          }
+        } else {
+          // Downward triangle
+          if (tri.row % 2 === 0) {
+            // Even row: down triangle 
+            v1 = getGridPoint(tri.row, tri.col + 1);
+            v2 = getGridPoint(tri.row + 1, tri.col);
+            v3 = getGridPoint(tri.row + 1, tri.col + 1);
+          } else {
+            // Odd row: down triangle
+            v1 = getGridPoint(tri.row, tri.col);
+            v2 = getGridPoint(tri.row + 1, tri.col);
+            v3 = getGridPoint(tri.row + 1, tri.col + 1);
+          }
+        }
+        
+        beginShape();
+        vertex(v1.x, v1.y);
+        vertex(v2.x, v2.y);
+        vertex(v3.x, v3.y);
+        endShape(CLOSE);
+      }
+    }
+    
+    function generateRandomTriangles() {
+      triangles = [];
+      
+      const triangleHeight = (Math.sqrt(3) / 2) * gridSize;
+      const numRows = Math.ceil(height / triangleHeight) + 2;
+      const numCols = Math.ceil(width / gridSize) + 2;
+      
+      let density, clusterProb;
+      
+      switch(generationModel) {
+        case 'random':
+          density = 0.15;
+          for (let row = 0; row < numRows; row++) {
+            for (let col = 0; col < numCols; col++) {
+              // Each grid cell can have up to 2 triangles (up and down)
+              if (random() < density) {
+                triangles.push({row, col, pointsUp: true});
+              }
+              if (random() < density) {
+                triangles.push({row, col, pointsUp: false});
+              }
+            }
+          }
+          break;
+          
+        case 'sparse':
+          density = 0.05;
+          for (let row = 0; row < numRows; row++) {
+            for (let col = 0; col < numCols; col++) {
+              if (random() < density) {
+                triangles.push({row, col, pointsUp: random() > 0.5});
+              }
+            }
+          }
+          break;
+          
+        case 'dense':
+          density = 0.3;
+          for (let row = 0; row < numRows; row++) {
+            for (let col = 0; col < numCols; col++) {
+              if (random() < density) {
+                triangles.push({row, col, pointsUp: true});
+              }
+              if (random() < density) {
+                triangles.push({row, col, pointsUp: false});
+              }
+            }
+          }
+          break;
+          
+        case 'clustered':
+          // Start with some seed triangles
+          let seeds = [];
+          for (let i = 0; i < 10; i++) {
+            seeds.push({
+              row: floor(random(numRows)),
+              col: floor(random(numCols))
+            });
+          }
+          
+          // Grow clusters around seeds
+          for (let seed of seeds) {
+            let clusterSize = floor(random(5, 15));
+            for (let i = 0; i < clusterSize; i++) {
+              let row = seed.row + floor(random(-3, 4));
+              let col = seed.col + floor(random(-3, 4));
+              if (row >= 0 && row < numRows && col >= 0 && col < numCols) {
+                if (random() > 0.5) {
+                  triangles.push({row, col, pointsUp: random() > 0.5});
+                }
+              }
+            }
+          }
+          break;
+          
+        case 'diagonal':
+          for (let row = 0; row < numRows; row++) {
+            for (let col = 0; col < numCols; col++) {
+              if ((row + col) % 5 < 2 && random() > 0.3) {
+                triangles.push({row, col, pointsUp: (row + col) % 2 === 0});
+              }
+            }
+          }
+          break;
+          
+        case 'connected':
+          // Generate connected snake-like chains of triangles
+          let numSnakes = floor(random(5, 12));
+          let used = new Set();
+          
+          for (let s = 0; s < numSnakes; s++) {
+            let snakeLength = floor(random(6, 13));
+            let startRow = floor(random(numRows));
+            let startCol = floor(random(numCols));
+            let startUp = random() > 0.5;
+            
+            let currentTri = {row: startRow, col: startCol, pointsUp: startUp};
+            let snake = [];
+            
+            for (let i = 0; i < snakeLength; i++) {
+              let key = `${currentTri.row},${currentTri.col},${currentTri.pointsUp}`;
+              
+              if (used.has(key)) break;
+              
+              snake.push({...currentTri});
+              used.add(key);
+              
+              // Get adjacent triangles
+              let neighbors = getAdjacentTriangles(currentTri.row, currentTri.col, currentTri.pointsUp, numRows, numCols);
+              
+              // Filter out already used neighbors
+              neighbors = neighbors.filter(n => {
+                let nKey = `${n.row},${n.col},${n.pointsUp}`;
+                return !used.has(nKey);
+              });
+              
+              if (neighbors.length === 0) break;
+              
+              // Pick a random neighbor
+              currentTri = neighbors[floor(random(neighbors.length))];
+            }
+            
+            triangles.push(...snake);
+          }
+          break;
+      }
+    }
+    
+    function getAdjacentTriangles(row, col, pointsUp, maxRows, maxCols) {
+      let adjacent = [];
+      
+      if (pointsUp) {
+        // Upward triangle has 3 neighbors
+        if (row % 2 === 0) {
+          // Even row up triangle
+          // Left neighbor: down triangle at same position
+          if (col > 0) {
+            adjacent.push({row, col: col - 1, pointsUp: false});
+          }
+          // Right neighbor: down triangle at same position
+          adjacent.push({row, col, pointsUp: false});
+          // Bottom neighbor: down triangle below
+          if (row + 1 < maxRows) {
+            adjacent.push({row: row + 1, col, pointsUp: false});
+          }
+        } else {
+          // Odd row up triangle
+          // Left neighbor: down triangle at same position
+          adjacent.push({row, col, pointsUp: false});
+          // Right neighbor: down triangle at same position
+          if (col + 1 < maxCols) {
+            adjacent.push({row, col: col + 1, pointsUp: false});
+          }
+          // Bottom neighbor: down triangle below
+          if (row + 1 < maxRows) {
+            adjacent.push({row: row + 1, col, pointsUp: false});
+          }
+        }
+      } else {
+        // Downward triangle has 3 neighbors
+        if (row % 2 === 0) {
+          // Even row down triangle
+          // Top neighbor: up triangle above
+          if (row > 0) {
+            adjacent.push({row: row - 1, col, pointsUp: true});
+          }
+          // Bottom-left neighbor: up triangle at same position
+          adjacent.push({row, col, pointsUp: true});
+          // Bottom-right neighbor: up triangle at same position
+          if (col + 1 < maxCols) {
+            adjacent.push({row, col: col + 1, pointsUp: true});
+          }
+        } else {
+          // Odd row down triangle
+          // Top neighbor: up triangle above
+          if (row > 0) {
+            adjacent.push({row: row - 1, col, pointsUp: true});
+          }
+          // Bottom-left neighbor: up triangle at same position
+          if (col > 0) {
+            adjacent.push({row, col: col - 1, pointsUp: true});
+          }
+          // Bottom-right neighbor: up triangle at same position
+          adjacent.push({row, col, pointsUp: true});
+        }
+      }
+      
+      return adjacent;
+    }
+    
+    function createControls() {
+      // Grid Size slider
+      let sizeSlider = createSlider(10, 80, gridSize, 1);
+      sizeSlider.position(-1000, -1000); // Hide default position
+      sizeSlider.input(() => {
+        gridSize = sizeSlider.value();
+        document.getElementById('size-value').textContent = gridSize;
+      });
+      window.sizeSlider = sizeSlider;
+      
+      
+      // Stroke width slider
+      let strokeSlider = createSlider(0, 10, strokeWidth, 0.5);
+      strokeSlider.position(-1000, -1000);
+      strokeSlider.input(() => {
+        strokeWidth = strokeSlider.value();
+        document.getElementById('stroke-width-value').textContent = strokeWidth.toFixed(1);
+      });
+      window.strokeSlider = strokeSlider;
+      
+      // Saturation slider
+      let satSlider = createSlider(0, 100, saturation, 1);
+      satSlider.position(-1000, -1000);
+      satSlider.input(() => {
+        saturation = satSlider.value();
+        document.getElementById('saturation-value').textContent = saturation;
+      });
+      window.satSlider = satSlider;
+      
+      // Brightness slider
+      let brightSlider = createSlider(0, 100, brightness, 1);
+      brightSlider.position(-1000, -1000);
+      brightSlidcontrol-group">
+      <span class="control-label">Stroke Width</span>
+      <div class="slider-container">
+        <div id="stroke-width-value" class="value-display">0.0</div>
+        <div id="stroke-slider"></div>
+      </div>
+    </div>
+    
+    <div class="control-group">
+      <span class="control-label">Stroke Color</span>
+      <div class="color-control">
+        <input type="color" id="stroke-color" value="#000000" onchange="updateStrokeColor(this.value)">
+      </div>
+    </div>
+    
+    <div class="control-group">
+      <span class="control-label">Fill Mode</span>
+      <select onchange="updateFillMode(this.value)">
+        <option value="solid">Solid</option>
+        <option value="random">Random</option>
+      </select>
+    </div>
+    
+    <div class="control-group">
+      <span class="control-label">Fill Color</span>
+      <div class="color-control">
+        <input type="color" id="fill-color" value="#333333" onchange="updateFillColor(this.value)">
+      </div>
+    </div>
+    
+    <div class="control-group">
+      <span class="control-label">Saturation</span>
+      <div class="slider-container">
+        <div id="saturation-value" class="value-display">50</div>
+        <div id="saturation-slider"></div>
+      </div>
+    </div>
+    
+    <div class="control-group">
+      <span class="control-label">Brightness</span>
+      <div class="slider-container">
+        <div id="brightness-value" class="value-display">50</div>
+        <div id="brightness-slider"></div>
+      </div>
+    </div>
+    
+    <div class="er.input(() => {
+        brightness = brightSlider.value();
+        document.getElementById('brightness-value').textContent = brightness;
+      });
+      window.brightSlider = brightSlider;
+    }
+    
+    function updateStrokeColor(hex) {
+      strokeColor = color(hex);
+    }
+    
+    function updateFillColor(hex) {
+      fillColor = color(hex);
+    }
+    
+    function updateFillMode(mode) {
+      fillMode = mode;
+      // Dot size slider
+        if (window.strokeSlider) {
+          document.getElementById('stroke-slider').appendChild(window.strokeSlider.elt);
+        }
+        if (window.satSlider) {
+          document.getElementById('saturation-slider').appendChild(window.satSlider.elt);
+        }
+        if (window.brightSlider) {
+          document.getElementById('brightness-slider').appendChild(window.brightSlider.elt);
+        }
+      let dotSlider = createSlider(1, 10, dotSize, 0.5);
+      dotSlider.position(-1000, -1000);
+      dotSlider.input(() => {
+        dotSize = dotSlider.value();
+        document.getElementById('dot-value').textContent = dotSize.toFixed(1);
+      });
+      window.dotSlider = dotSlider;
+    }
+    
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+    
+    function saveImage() {
+      save('isometric-grid.png');
+    }
+  </script>
+  
+  <div id="control-panel">
+    <div class="control-group">
+      <span class="control-label">Triangle Size</span>
+      <div class="slider-container">
+        <div id="size-value" class="value-display">30</div>
+        <div id="size-slider"></div>
+      </div>
+    </div>
+    
+    <div class="control-group">
+      <span class="control-label">Dot Size</span>
+      <div class="slider-container">
+        <div id="dot-value" class="value-display">3.0</div>
+        <div id="dot-slider"></div>
+      </div>
+    </div>
+    
+    <div class="button-group">
+      <select id="model-select" onchange="generationModel = this.value">
+        <option value="random">Random</option>
+        <option value="sparse">Sparse</option>
+        <option value="dense">Dense</option>
+        <option value="clustered">Clustered</option>
+        <option value="diagonal">Diagonal</option>
+        <option value="connected">Connected Snakes</option>
+      </select>
+      <button onclick="generateRandomTriangles()">Generate Random Tris</button>
+      <button onclick="triangles = []">Clear</button>
+      <button onclick="saveImage()">Save PNG</button>
+    </div>
+  </div>
+  
+  <script>
+    // Mount sliders to DOM after page loads
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        if (window.sizeSlider) {
+          document.getElementById('size-slider').appendChild(window.sizeSlider.elt);
+        }
+        if (window.dotSlider) {
+          document.getElementById('dot-slider').appendChild(window.dotSlider.elt);
+        }
+      }, 100);
+    });
+  </script>
+</body>
+</html>
